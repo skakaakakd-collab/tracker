@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Дневник приёма</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one phone-first column. Sticky header with two tabs.
+   Таблетки = week strip + checklist grouped by time of day.
+   Вода = 35 cells (7x5, 100 ml each) + one large +100 ml button + week history. */
+:root {
+  --bg: #0B0D10;
+  --surface: #15191F;
+  --surface-2: #1C222A;
+  --ink: #F3F5F7;
+  --muted: #929AA6;
+  --line: #232A33;
+  --line-2: #3A4350;
+  --accent: #00B8FF;
+  --accent-soft: rgba(0, 184, 255, 0.14);
+  --on-accent: #04141C;
+  --water: #56CCFF;
+  --water-btn: #00B8FF;
+  --on-water: #04141C;
+  --ok: #00B8FF;
+  --warn: #FF7777;
+  --warn-soft: rgba(255, 119, 119, 0.14);
+  --supp: #A78BFA;
+  --supp-soft: rgba(167, 139, 250, 0.16);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --f-display: "Unbounded", "Onest", system-ui, sans-serif;
+  --f-body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.45 var(--f-body);
+  padding-block: 0 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-text-size-adjust: 100%;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg);
+  z-index: 10;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 560px; margin: 0 auto; }
+
+header {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--bg);
+  padding-block: 16px 10px;
+}
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font: 700 19px/1.2 var(--f-display); letter-spacing: -0.01em; }
+.date { font: 500 13px var(--f-mono); color: var(--muted); }
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-top: 12px;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.tab {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+
+/* week strip */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.day .wd { font-size: 12px; color: var(--muted); }
+.day .dn { font: 500 17px var(--f-mono); }
+.day.today .dn { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.day .bar { width: 60%; height: 3px; margin-top: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.day .bar i { display: block; height: 100%; background: var(--ok); }
+.day[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.day[aria-pressed="true"] .wd { color: var(--accent); }
+.day[aria-pressed="true"] .bar { background: rgba(0, 184, 255, 0.25); }
+
+.sum { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 22px; }
+.sum h2 { margin: 0; font: 600 17px/1.3 var(--f-body); }
+.sum .cnt { font: 500 14px var(--f-mono); color: var(--muted); white-space: nowrap; }
+.prog { height: 6px; margin-top: 10px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--ok); transition: width 0.25s ease; }
+
+.grp-h {
+  display: flex;
+  justify-content: space-between;
+  margin: 24px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 68px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.item.next { border-color: var(--accent); }
+.chk {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--line-2);
+  border-radius: 50%;
+  color: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.item[aria-pressed="true"] .chk { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
+.body { display: block; min-width: 0; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 500 13px var(--f-mono); color: var(--muted); }
+.item.late .meta .t { color: var(--warn); }
+.name { display: block; margin-top: 2px; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.dose { display: block; font-size: 14px; color: var(--muted); }
+.item[aria-pressed="true"] .name { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.chip { padding: 1px 7px; border-radius: 6px; font: 600 11px/1.5 var(--f-body); letter-spacing: 0.02em; }
+.chip.next { background: var(--accent-soft); color: var(--accent); }
+.chip.late { background: var(--warn-soft); color: var(--warn); }
+.chip.supp { background: var(--supp-soft); color: var(--supp); }
+.chip.tag { background: var(--surface-2); color: var(--ink); }
+
+/* water */
+.big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 10px; }
+.big .v { font: 700 54px/1 var(--f-display); font-variant-numeric: tabular-nums; color: var(--water); letter-spacing: -0.02em; }
+.big .of { color: var(--muted); font-size: 16px; }
+.state { margin-top: 8px; font-size: 15px; color: var(--muted); }
+.state b { color: var(--ink); font-weight: 600; }
+.state.done b { color: var(--ok); }
+.cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 18px; }
+.cell { aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); transition: background 0.2s ease; }
+.cell.on { background: var(--water); border-color: var(--water); }
+.cell.full { background: var(--ok); border-color: var(--ok); }
+.cap { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.actions { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; margin-top: 18px; }
+.btn {
+  min-height: 68px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn.primary { background: var(--water-btn); color: var(--on-water); border-color: transparent; font-size: 21px; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.hist-h { display: flex; justify-content: space-between; margin: 30px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.hist { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.hcol { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.hb { position: relative; width: 100%; height: 76px; overflow: hidden; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); }
+.hb i { position: absolute; inset: auto 0 0 0; background: var(--water); }
+.hb.ok i { background: var(--ok); }
+.hcol .wd { font-size: 12px; color: var(--muted); }
+.hcol.today .wd { color: var(--ink); font-weight: 600; }
+.hcol .val { font: 500 12px var(--f-mono); color: var(--muted); }
+.note { margin-top: 32px; font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+@media (max-width: 380px) {
+  .actions { grid-template-columns: 80px minmax(0, 1fr); }
+  .big .v { font-size: 46px; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  var GOAL = 3500, STEP = 100, MAX = 10000, KEEP_DAYS = 120;
+
+  // Лекарства и время приёма
+  var ITEMS = {
+    mg:  { kind: "supp", t: "06:10", start: "06:10", name: "Магний треонат", dose: "1 капсула" },
+    q10: { kind: "supp", t: "09:10", start: "09:10", name: "Коэнзим Q10 и Железо" },
+    k1:  { kind: "supp", t: "13:20", start: "13:20", name: "Калий", dose: "2 капсулы" },
+    k2:  { kind: "supp", t: "17:30–18:00", start: "17:30", name: "Калий и D3+K2", dose: "Калий 2 капсулы" },
+    inj: { t: "20:00±", start: "20:00", name: "Инъекция тестостерона", tag: "Инъекция" },
+    cre: { t: "20:10", start: "20:10", name: "Крестор" },
+    ana: { t: "20:10", start: "20:10", name: "Анастрозол" }
+  };
+  // Пн … Вс
+  var WEEK = [
+    ["mg", "q10", "k1", "k2", "inj", "cre"],
+    ["mg", "q10", "k1", "k2", "ana"],
+    ["mg", "q10", "k1", "k2", "cre"],
+    ["mg", "q10", "k1", "k2", "inj"],
+    ["mg", "q10", "k1", "k2", "cre"],
+    ["mg", "q10", "k1", "k2"],
+    ["mg", "q10", "k1", "k2"]
+  ];
+  var WD = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  var GROUPS = [
+    { label: "Утро", to: 720 },
+    { label: "День", to: 1020 },
+    { label: "Вечер", to: 1441 }
+  ];
+
+  var CHECK = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function widx(d) { return (d.getDay() + 6) % 7; }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function dkey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function mins(hhmm) { var p = hhmm.split(":"); return +p[0] * 60 + +p[1]; }
+  function num(n) { return Number(n).toLocaleString("ru-RU"); }
+  function cap1(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  var state = { done: {}, water: {} };
+  var tab = location.hash === "#water" ? "water" : "pills";
+  var lastToday = dkey(new Date());
+  var sel = startOfDay(new Date());
+  var mode = "local";
+  var ref = null, timer = null, busy = false, dirty = false;
+  var $app = document.getElementById("app");
+  var lastHTML = "";
+
+  // ---------- хранение ----------
+  var LS = "dnevnik-priema-v1";
+  function normalize(d) {
+    try { d = JSON.parse(JSON.stringify(d || {})); } catch (e) { d = {}; }
+    return { done: (d.done && typeof d.done === "object") ? d.done : {}, water: (d.water && typeof d.water === "object") ? d.water : {} };
+  }
+  function snapshot() {
+    var cut = dkey(addDays(startOfDay(new Date()), -KEEP_DAYS)), out = { done: {}, water: {} };
+    Object.keys(state.done).forEach(function (k) { if (k >= cut) out.done[k] = state.done[k]; });
+    Object.keys(state.water).forEach(function (k) { if (k >= cut) out.water[k] = state.water[k]; });
+    return out;
+  }
+  function loadLocal() {
+    try { var r = localStorage.getItem(LS); if (r) state = normalize(JSON.parse(r)); } catch (e) {}
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LS, JSON.stringify(snapshot())); } catch (e) {}
+  }
+  function hasData() { return Object.keys(state.done).length > 0 || Object.keys(state.water).length > 0; }
+
+  function flush() {
+    if (!ref) return Promise.resolve();
+    if (busy) { dirty = true; return Promise.resolve(); }
+    busy = true;
+    return (async function () {
+      try {
+        do { dirty = false; await ref.set(snapshot()); } while (dirty);
+      } catch (e) {
+        mode = "local"; ref = null; render();
+      }
+      busy = false;
+    })();
+  }
+  function changed() {
+    saveLocal();
+    if (!ref) return;
+    clearTimeout(timer);
+    timer = setTimeout(function () { timer = null; flush(); }, 500);
+  }
+
+  async function initCloud() {
+    try {
+      if (!window.claude || !window.claude.use) return;
+      var res = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      var db = res[0], user = res[1];
+      if (!db || !user) return;
+      var id = await user.id();
+      if (!id) return;
+      var r = db.doc("data/users/" + id + "/diary");
+      var first = true;
+      r.onSnapshot(function (snap) {
+        if (timer || busy) return;
+        if (snap.exists) {
+          state = normalize(snap.data());
+          saveLocal();
+        } else if (first && hasData()) {
+          ref = r; changed();
+        }
+        first = false;
+        ref = r; mode = "cloud";
+        render();
+      }, function () { mode = "local"; ref = null; render(); });
+    } catch (e) {}
+  }
+
+  // ---------- действия ----------
+  function toggle(id) {
+    var k = dkey(sel), s = new Set(state.done[k] || []);
+    if (s.has(id)) s.delete(id); else s.add(id);
+    if (s.size) state.done[k] = Array.from(s); else delete state.done[k];
+    changed(); render();
+  }
+  function addWater(delta) {
+    var k = dkey(new Date()), v = (state.water[k] || 0) + delta;
+    v = Math.max(0, Math.min(MAX, v));
+    if (v) state.water[k] = v; else delete state.water[k];
+    changed(); render();
+  }
+
+  // ---------- отрисовка ----------
+  function pillsHTML(today) {
+    var ids = WEEK[widx(sel)].slice().sort(function (a, b) { return mins(ITEMS[a].start) - mins(ITEMS[b].start); });
+    var key = dkey(sel), done = new Set(state.done[key] || []);
+    var isToday = key === dkey(today);
+    var now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+    var pending = ids.filter(function (i) { return !done.has(i); });
+    var nextId = isToday ? pending[0] : null;
+
+    var mon = addDays(today, -widx(today));
+    var strip = WD.map(function (w, i) {
+      var d = addDays(mon, i), k = dkey(d), tot = WEEK[i].length;
+      var n = (state.done[k] || []).filter(function (x) { return WEEK[i].indexOf(x) >= 0; }).length;
+      var cls = "day" + (k === dkey(today) ? " today" : "");
+      return '<button class="' + cls + '" data-act="day" data-id="' + k + '" aria-pressed="' + (k === key) + '" aria-label="' + w + ', ' + d.getDate() + ', принято ' + n + ' из ' + tot + '">' +
+        '<span class="wd">' + w + '</span><span class="dn">' + d.getDate() + '</span>' +
+        '<span class="bar"><i style="width:' + Math.round(n / tot * 100) + '%"></i></span></button>';
+    }).join("");
+
+    var title = isToday
+      ? "Сегодня, " + sel.toLocaleDateString("ru-RU", { weekday: "long" })
+      : cap1(sel.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }));
+    var total = ids.length, n = ids.length - pending.length;
+
+    var groups = GROUPS.map(function (g, gi) {
+      var from = gi ? GROUPS[gi - 1].to : 0;
+      var inG = ids.filter(function (i) { var m = mins(ITEMS[i].start); return m >= from && m < g.to; });
+      if (!inG.length) return "";
+      var gd = inG.filter(function (i) { return done.has(i); }).length;
+      var rows = inG.map(function (i) {
+        var it = ITEMS[i], isDone = done.has(i);
+        var late = isToday && !isDone && mins(it.start) + 40 < nowMin;
+        var cls = "item" + (late ? " late" : "") + (i === nextId && !late ? " next" : "");
+        var chips = "";
+        if (it.kind === "supp") chips += '<span class="chip supp">БАД</span>';
+        if (it.tag) chips += '<span class="chip tag">' + it.tag + '</span>';
+        if (!isDone && late) chips += '<span class="chip late">Время прошло</span>';
+        else if (!isDone && i === nextId) chips += '<span class="chip next">Дальше</span>';
+        return '<button class="' + cls + '" data-act="toggle" data-id="' + i + '" aria-pressed="' + isDone + '">' +
+          '<span class="chk">' + CHECK + '</span>' +
+          '<span class="body"><span class="meta"><span class="t">' + it.t + '</span>' + chips + '</span>' +
+          '<span class="name">' + it.name + '</span>' +
+          (it.dose ? '<span class="dose">' + it.dose + '</span>' : '') + '</span></button>';
+      }).join("");
+      return '<div class="grp-h"><span>' + g.label + '</span><span>' + gd + ' / ' + inG.length + '</span></div><div class="list">' + rows + '</div>';
+    }).join("");
+
+    return '<div class="week">' + strip + '</div>' +
+      '<div class="sum"><h2>' + title + '</h2><span class="cnt">' + n + ' из ' + total + '</span></div>' +
+      '<div class="prog"><i style="width:' + Math.round(n / total * 100) + '%"></i></div>' + groups;
+  }
+
+  function waterHTML(today) {
+    var tk = dkey(today), ml = state.water[tk] || 0;
+    var cells = "";
+    var filled = Math.floor(ml / STEP), totalCells = GOAL / STEP, reached = ml >= GOAL;
+    for (var i = 0; i < totalCells; i++) {
+      cells += '<div class="cell' + (i < filled ? (reached ? " full" : " on") : "") + '"></div>';
+    }
+    var left = Math.max(0, GOAL - ml);
+    var stateLine = reached
+      ? '<div class="state done"><b>Норма выполнена</b>' + (ml > GOAL ? ' · сверх нормы ' + num(ml - GOAL) + ' мл' : '') + '</div>'
+      : '<div class="state">Осталось <b>' + num(left) + ' мл</b> · ' + Math.round(ml / GOAL * 100) + '%</div>';
+
+    var mon = addDays(today, -widx(today));
+    var hist = WD.map(function (w, i) {
+      var d = addDays(mon, i), k = dkey(d), v = state.water[k] || 0, pct = Math.min(100, v / GOAL * 100);
+      var future = d > today;
+      var lit = (v / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+      return '<div class="hcol' + (k === tk ? " today" : "") + '"><div class="hb' + (v >= GOAL ? " ok" : "") + '"><i style="height:' + pct + '%"></i></div>' +
+        '<span class="wd">' + w + '</span><span class="val">' + (future || !v ? "–" : lit) + '</span></div>';
+    }).join("");
+
+    return '<div class="big"><span class="v">' + num(ml) + '</span><span class="of">из ' + num(GOAL) + ' мл</span></div>' +
+      stateLine +
+      '<div class="cells" role="img" aria-label="Выпито ' + ml + ' из ' + GOAL + ' мл">' + cells + '</div>' +
+      '<div class="cap">Одна клетка равна ' + STEP + ' мл</div>' +
+      '<div class="actions"><button class="btn" data-act="minus" aria-label="Убрать ' + STEP + ' мл"' + (ml <= 0 ? " disabled" : "") + '>−' + STEP + '</button>' +
+      '<button class="btn primary" data-act="plus">+' + STEP + ' мл</button></div>' +
+      '<div class="hist-h"><span>Неделя, литры</span><span>норма ' + num(GOAL) + ' мл</span></div><div class="hist">' + hist + '</div>';
+  }
+
+  function render() {
+    var today = startOfDay(new Date());
+    if (dkey(today) !== lastToday) { if (dkey(sel) === lastToday) sel = today; lastToday = dkey(today); }
+    var dateTxt = today.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
+    var html =
+      '<header><div class="top"><h1>Дневник приёма</h1><span class="date">' + dateTxt + '</span></div>' +
+      '<div class="tabs" role="tablist">' +
+      '<button class="tab" role="tab" data-act="tab" data-id="pills" aria-selected="' + (tab === "pills") + '">Таблетки</button>' +
+      '<button class="tab" role="tab" data-act="tab" data-id="water" aria-selected="' + (tab === "water") + '">Вода</button>' +
+      '</div></header>' +
+      (tab === "pills" ? pillsHTML(today) : waterHTML(today)) +
+      '<p class="note">' + (mode === "cloud" ? "Отметки сохраняются в вашем аккаунте." : "Отметки сохраняются только в этом браузере.") + '</p>';
+    if (html === lastHTML) return;
+    lastHTML = html;
+    var a = document.activeElement, sig = null;
+    if (a && a.dataset && a.dataset.act) sig = [a.dataset.act, a.dataset.id || ""];
+    $app.innerHTML = html;
+    if (sig) {
+      var el = $app.querySelector('[data-act="' + sig[0] + '"]' + (sig[1] ? '[data-id="' + sig[1] + '"]' : ""));
+      if (el && !el.disabled) { try { el.focus({ preventScroll: true }); } catch (e) {} }
+    }
+  }
+
+  $app.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-act]");
+    if (!b) return;
+    var act = b.dataset.act, id = b.dataset.id;
+    if (act === "tab") { tab = id; render(); }
+    else if (act === "day") { var p = id.split("-"); sel = new Date(+p[0], +p[1] - 1, +p[2]); render(); }
+    else if (act === "toggle") toggle(id);
+    else if (act === "plus") addWater(STEP);
+    else if (act === "minus") addWater(-STEP);
+  });
+
+  loadLocal();
+  render();
+  setInterval(render, 60000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) render(); });
+  initCloud();
+})();
+</script>
+</body>
+</html>
